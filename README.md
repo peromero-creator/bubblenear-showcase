@@ -89,7 +89,7 @@ The sum is capped at 100 and split into five 20-point levels. Scores are recompu
 
 **Caching sized for a 512 MB container.** A TTL cache with in-flight de-duplication sits in front of every upstream call, so concurrent requests for the same account share one fetch, and wallet histories are reused across tokens since the same wallets hold many launchpad tokens. Transactions are immutable, so a slimmed copy (only transfer actions and transfer logs) is kept in a bounded store. Both stores evict oldest entries first.
 
-**Job registry, warm cache and snapshot seeding.** Map builds run as background jobs; a request starts or joins a build and immediately gets the partial map, and the client polls until it is ready. At most two builds run at once. A warmer pre-scans the most traded tokens on a slower clock, and finished maps stay fresh for hours because every scan costs API credits. Finished maps are written to a seed file, and the release script pulls a snapshot from the live server into the new build, so a deploy starts warm instead of rescanning everything.
+**Instant maps with stale-while-revalidate.** A cold scan of one token takes about 25 seconds (holders 5 s, contracts and keys 7 s, transfers 9 s, funders 3 s), almost all of it waiting on API rate limits. Visitors never wait for that on a listed token: a warmer pre-scans every token the site lists (the default token table and the NEAR tab, about 90 tokens), refreshing traded tokens daily and zero-volume tokens weekly to save credits. A token that was scanned before is answered at once with its last complete map, about a second end to end, while a rescan runs behind it and the page swaps the new map in when it lands. Builds run as background jobs behind a two-slot queue, a hung build is skipped after four minutes, and warmer progress is reported on the health endpoint. Finished maps are written to a seed file, and the release script pulls a snapshot from the live server into the new build, so a deploy starts warm instead of rescanning everything.
 
 **Force map with spring physics.** The map is a d3-force simulation drawn on canvas with custom painting: shaded spheres, idle drift, marching dashed links. A radial force places the heaviest cluster in the centre and rings everything else around it by weight. Dragging a wallet pulls its cluster along through link springs, and dropped groups stay where they were put. To avoid a hairball, only a spanning tree of each cluster is drawn (Kruskal-style, strongest evidence first: same key, transfer, funded, sub-account, same funder); the full evidence list stays in the side panel. Clicks are hit-tested manually against drifted positions because the graph library drops clicks on tiny pointer movements.
 
@@ -98,6 +98,17 @@ The sum is capped at 100 and split into five 20-point levels. Scores are recompu
 **Price data.** Charts use Nearly's own candles for launchpad tokens and fall back to GeckoTerminal's highest-volume pool for everything else, rendered with Lightweight Charts.
 
 **Deploy.** The app runs as a single long-lived Next.js standalone server in Docker on Spaceship Hyperlift. Its builders are too small for a Next.js build, so a release script builds locally and publishes the ready-to-run server to a dedicated deploy branch whose Dockerfile only copies files.
+
+## Launch and distribution
+
+The product went from first commit to a launched token with its own audience channel in nine days (September 28 to October 7, 2026), and I ran every step:
+
+- **Token launch.** Launched the project token, BNEAR (`bnear-4.nearlytrade.near`), on the Nearly launchpad, then mapped it in public on the site first: Low risk (2/100), dev share 0.2%, no linked wallets. The landing page has a token section at [bubblenear.co/#token](https://bubblenear.co/#token) with live FDV, holder stats, a candle chart and a link to buy on Nearly.
+- **Brand.** Logo, X avatar and banner (overlapping glossy bubbles), rendered from code so every asset stays consistent with the site.
+- **X channel.** Ran [@bubblenear](https://x.com/bubblenear) as the distribution channel: data-driven posts where every tweet carries the token's server-rendered map card, link and contract address, replies with cards under launchpad and ecosystem announcements (Nearly, NEAR, Rhea), and a posting schedule using X's native scheduler plus a scheduled agent for replies.
+- **Operations.** Kept the site within paid API credits (multi-key rotation, daily and weekly refresh tiers) and restored service myself after a hosting lapse.
+
+Organic reach on a new account in a cooling market was small, which is the honest result; the pipeline from scan to share card to post is in place for when attention returns.
 
 ## Tech stack
 
@@ -120,7 +131,9 @@ The sum is capped at 100 and split into five 20-point levels. Scores are recompu
 | Bubble map with clusters | Selected wallet with its evidence |
 | ![Share card](assets/card-nomo.png) | ![Share card](assets/card-blackdragon.png) |
 | Share card, launchpad token | Share card, established NEAR token |
+| ![BNEAR token section](assets/token.png) | |
+| Project token section: stats, chart, buy link | |
 
 ## Status and role
 
-Live at [bubblenear.co](https://bubblenear.co). Designed and built end to end by me in 2026: data pipeline, clustering and risk model, map rendering, share cards, brand and deployment. The source code is private and available on request.
+Live at [bubblenear.co](https://bubblenear.co). Designed, built and launched end to end by me in 2026: data pipeline, clustering and risk model, map rendering, share cards, brand, deployment, token launch and X distribution. The source code is private and available on request.
